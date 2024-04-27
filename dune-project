@@ -17,7 +17,7 @@
 
 (package
  (name graphql_jsoo_client)
- (synopsis "GrpahQL over WebSocket cliengt")
+ (synopsis "GrpahQL over WebSocket client")
  (description "A GraphQl client that can be compiled using jsoo to access GraphQl servers using websocket. It was created with the main purpose of using it in combination with the Dream web-framework.")
  (depends ocaml dune
   dream 
