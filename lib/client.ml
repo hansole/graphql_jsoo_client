@@ -1,11 +1,20 @@
-open Lwt.Infix
+open! Js_of_ocaml
+open! Connection
 
-let yojson_of_string = Ppx_yojson_conv_lib__Yojson_conv.yojson_of_string
 
-module ForQuery (Q : QuerySig.Query) = struct
-  (* module SerializableQ = Queries.SerializableQuery(Q) *)
+(* type connection = Connection.t *)
+(* let yojson_of_string = Ppx_yojson_conv_lib__Yojson_conv.yojson_of_string *)
 
-  type response = 
+(* Export some cunctions form Connection module *)
+let connect = Connection.connect
+let disconnect = Connection.disconnect
+let debug_list_handlers = Connection.debug_list_handlers
+let trace_console = Connection.trace_console
+let string_of_state = Connection.string_of_state
+
+module Make (Q : QuerySig.Query) = struct
+
+  type response =
     | Success of Q.t
     | Unauthorized
     | Forbidden
@@ -13,9 +22,7 @@ module ForQuery (Q : QuerySig.Query) = struct
     | TooManyRequests
     | OtherError of string
 
-  let url = Uri.of_string "/graphql"
-
-  let create_body q vars =
+  let query_to_json (q: string) vars =
     let yojson = `Assoc [
         "query",
         `String q;
@@ -24,36 +31,94 @@ module ForQuery (Q : QuerySig.Query) = struct
       ] |> Yojson.Basic.to_string
                  |> Yojson.Safe.from_string
     in
-    let json = Yojson.Safe.to_string yojson in
-    Cohttp_lwt.Body.of_string json
+    yojson
 
-  let query ?(url = url) vars =
-    Cohttp_lwt_jsoo.Client.post
-      ~headers:(Cohttp.Header.init_with "Content-Type" "application/json")
-      ~body:(create_body Q.query vars ) url
-    (* ~body:(create_body Q.query vars) url *)
-    >>= fun (resp, raw_body) ->
-    let body_str_lwt = Cohttp_lwt.Body.to_string raw_body in
-    body_str_lwt >|= fun body_str ->
-    match resp.status with
-    | #Cohttp.Code.success_status ->
-      let full_body_json = Yojson.Basic.from_string body_str in
-      let body_json = Yojson.Basic.Util.member "data" full_body_json in
+  let subscribe_message id query (* variables *) =
+    `Assoc [
+      "type", `String "subscribe";
+      "id", `String id;
+      "payload",
+      query;
+      (* "variables", `String variables; *)
+    ]
+    |> Yojson.Basic.to_string
+
+  let query_message id query (* variables *) =
+    `Assoc [
+      "type", `String "subscribe";
+      "id", `String id;
+      "payload",
+      query;
+    ]
+    |> Yojson.Basic.to_string
+
+  let complete_message id =
+    `Assoc [
+      "type", `String "complete";
+      "id", `String id;
+    ]
+    |> Yojson.Basic.to_string
+
+
+  let parse body_json =
+    let body_unsafe = Q.unsafe_fromJson body_json in
+    let body = Q.parse body_unsafe in
+    body
+
+
+  let subscribe (con : Connection.t) vars handler =
+    let yojson = query_to_json Q.query vars in
+    let uuid = Uuidm.(v `V4) |> Uuidm.to_string in
+    let json = subscribe_message uuid (Yojson.Safe.to_basic yojson) in
+    let handler_wrapper body_json =
       let body_unsafe = Q.unsafe_fromJson body_json in
       let body = Q.parse body_unsafe in
-      Success body
-    | `Unauthorized -> Unauthorized
-    | `Forbidden -> Forbidden
-    | `Not_found -> NotFound
-    | `Too_many_requests -> TooManyRequests
-    | #Cohttp.Code.server_error_status -> OtherError body_str
-    | #Cohttp.Code.redirection_status -> OtherError body_str
-    | #Cohttp.Code.informational_status -> OtherError body_str
-    | #Cohttp.Code.client_error_status -> OtherError body_str
-    (* This might not be correct... *)
-    | `Code _ -> OtherError body_str
+      handler body
+    in
+    Connection.add_handler con uuid (Subscribe handler_wrapper);
+    Connection.send con json;
+    Lwt.return uuid
+
+  let query (con : Connection.t) vars =
+    let yojson = query_to_json Q.query vars in
+    let uuid = Uuidm.(v `V4) |> Uuidm.to_string in
+    let json = query_message uuid (Yojson.Safe.to_basic yojson) in
+    let ww, s = Lwt.wait () in
+    let handler_fun m =
+      match m with 
+      | Connection.Success body_json ->
+        let body = parse body_json in
+        Lwt.wakeup_later s (Success body)
+      | Connection.Unauthorized ->
+        Lwt.wakeup_later s (Unauthorized)
+      | Connection.Forbidden ->
+        Lwt.wakeup_later s (Forbidden)
+      | Connection.NotFound ->
+        Lwt.wakeup_later s (NotFound)
+      | Connection.TooManyRequests ->
+        Lwt.wakeup_later s (TooManyRequests)
+      | Connection.OtherError e ->
+        Lwt.wakeup_later s (OtherError e)
+    in
+    Connection.add_handler con uuid (Query (handler_fun, None));
+    Connection.send con json;
+    ww
+
+  let unsubscribe (con : Connection.t) uuid =
+    let json = complete_message uuid in
+    Connection.remove_handler con uuid;
+    Connection.send con json;
+    Lwt.return_unit
+
+  let ping con payload =
+    let msg = Connection.ping_message payload in
+    Connection.send con msg;
+    Lwt.return_unit
+
+  let pong con payload =
+    let msg = Connection.pong_message payload in
+    Connection.send con msg;
+    Lwt.return_unit
 
 
 end
-
-

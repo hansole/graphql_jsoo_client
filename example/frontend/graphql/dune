@@ -1,0 +1,4 @@
+(library
+ (name test_frontend_graphql)
+ (libraries graphql_jsoo_client uuidm cohttp-lwt-jsoo yojson graphql_ppx)
+ (preprocess (pps lwt_ppx js_of_ocaml-ppx graphql_ppx ppx_yojson_conv)))
