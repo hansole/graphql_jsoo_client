@@ -22,6 +22,10 @@
  (depends ocaml dune
   dream 
   graphql_ppx
+  cohttp-lwt-jsoo
+  js_of_ocaml-ppx
+  ppx_yojson_conv
+  uuidm
  )
  (tags
   ("graphql" "jsoo" "websockets"))
