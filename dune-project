@@ -26,6 +26,7 @@
   js_of_ocaml-ppx
   ppx_yojson_conv
   uuidm
+  ppx_typed_fields
  )
  (tags
   ("graphql" "jsoo" "websockets"))
