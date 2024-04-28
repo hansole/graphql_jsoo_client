@@ -37,6 +37,12 @@ graphql_jsoo_client$ dune build example/frontend
 ```shell
 graphql_jsoo_client$ dune build
 ```
+It can be installed using `opam`
+```shell
+graphql_jsoo_client$ dune build graphql_jsoo_client.opam
+graphql_jsoo_client$ opam install .
+```
+(I will try to add it to the opam repository at some later time)
 
 <!-- It can be installed using `opam` -->
 <!-- ```shell -->
