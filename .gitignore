@@ -3,5 +3,4 @@ mermaid-filter.err
 .graphql_ppx_cache
 static/test_graphql_jsoo_client.bc.js
 static/test_graphql_jsoo_client.bc-for-jsoo
-graphql_jsoo_client.opam
 README.html
