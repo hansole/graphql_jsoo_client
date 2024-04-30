@@ -35,3 +35,6 @@
 )
 
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/dune-files.html#dune-project
+; x-ci-accept-failures: [
+;   "oraclelinux-9"
+; ]

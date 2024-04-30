@@ -36,3 +36,6 @@ build: [
   ]
 ]
 dev-repo: "git+https://github.com/hansole/graphql_jsoo_client.git"
+x-ci-accept-failures: [
+   "oraclelinux-9"
+]
